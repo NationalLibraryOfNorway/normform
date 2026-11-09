@@ -12,9 +12,9 @@ It also generates `[alt1|alt2]` morphological alternative brackets for ASR evalu
 ## Installation
 
 ```bash
-pip install git+https://github.com/NationalLibraryOfNorway/normform.git
+pip install normform
 # Or with batch dataset extras (Parquet / Hugging Face Datasets):
-pip install "normform[batch] @ git+https://github.com/NationalLibraryOfNorway/normform.git"
+pip install "normform[batch]"
 ```
 
 > [!NOTE]
