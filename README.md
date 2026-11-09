@@ -1,4 +1,7 @@
-# NormForm
+# NormForm (`v0.1.0` — Experimental)
+
+> [!WARNING]
+> **Experimental Release (`v0.1.0`)**: NormForm and its accompanying neural models and style profiles are currently **experimental (`v0.1`)**. CLI flags, Python APIs, model checkpoints, and style cache schemas may evolve in upcoming releases. Always review standardized outputs in production workflows.
 
 **NormForm** standardizes Norwegian Bokmål (`nob`) and Nynorsk (`nno`) text by making consistent choices among contextually valid morphological alternatives, while guaranteeing that non-alternative text is never altered.
 
@@ -15,7 +18,7 @@ pip install "normform[batch] @ git+https://github.com/NationalLibraryOfNorway/no
 ```
 
 > [!NOTE]
-> NormForm uses the pinned two-task neural models (`NbAiLab/normform-bokmaal-multitask` and `NbAiLab/normform-nynorsk-multitask`) and reviewed Hugging Face style caches (`NbAiLab/normform-bokmaal-redaksjonsnorm` and `NbAiLab/normform-nynorsk-nasjonalbiblioteknorm`). It **does not** require an Ordbank API key. If models or style repositories are private, authenticate once via `hf auth login`.
+> NormForm uses the public pinned two-task neural models (`NbAiLab/normform-bokmaal-multitask` and `NbAiLab/normform-nynorsk-multitask`) and public reviewed Hugging Face style caches (`NbAiLab/normform-bokmaal-redaksjonsnorm` and `NbAiLab/normform-nynorsk-nasjonalbiblioteknorm`). It **does not** require an Ordbank API key or Hugging Face authentication for public models and styles.
 
 ---
 

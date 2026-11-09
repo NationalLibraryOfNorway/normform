@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "normform"
 version = "0.1.0"
-description = "Context-aware Norwegian morphological standardization, alternative generation, and style auditing"
+description = "[Experimental v0.1] Context-aware Norwegian morphological standardization, alternative generation, and style auditing"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
@@ -23,7 +23,7 @@ keywords = [
     "normform",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Topic :: Text Processing :: Linguistic",

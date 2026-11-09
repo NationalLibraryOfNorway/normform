@@ -415,9 +415,20 @@ def _cmd_styles(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    from . import __version__
+
     parser = argparse.ArgumentParser(
         prog="normform",
-        description="NormForm: Context-aware Norwegian morphological standardization, alternative generation, and style auditing.",
+        description=(
+            f"NormForm v{__version__} (Experimental): Context-aware Norwegian morphological "
+            "standardization, alternative generation, and style auditing."
+        ),
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"normform {__version__} (experimental)",
     )
     subparsers = parser.add_subparsers(dest="command")
 
@@ -554,7 +565,7 @@ KNOWN_COMMANDS = {"standardize", "batch", "alternatives", "audit", "extract-styl
 def main(argv: Sequence[str] | None = None) -> int:
     raw_args = list(sys.argv[1:] if argv is None else argv)
     # Allow shorthand `normform -t "..."` or `normform -i file.txt` without typing `standardize`
-    if raw_args and raw_args[0] not in KNOWN_COMMANDS and raw_args[0] not in ("-h", "--help"):
+    if raw_args and raw_args[0] not in KNOWN_COMMANDS and raw_args[0] not in ("-h", "--help", "-V", "--version"):
         raw_args = ["standardize"] + raw_args
 
     parser = build_parser()
