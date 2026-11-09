@@ -22,8 +22,8 @@ DEFAULT_STYLE_REPOS = {
 }
 
 DEFAULT_STYLE_REVISIONS = {
-    "NbAiLab/normform-bokmaal-redaksjonsnorm": "8542693a8e5fe5e7294e0cee1c87019344bec03d",
-    "NbAiLab/normform-nynorsk-nasjonalbiblioteknorm": "ceaa918476e2ffcba477964922b580c1c19feb71",
+    "NbAiLab/normform-bokmaal-redaksjonsnorm": "ca6c55540cc32bf35fb5c1e89f141cdf5f86cd8f",
+    "NbAiLab/normform-nynorsk-nasjonalbiblioteknorm": "33d0403d721ecfea2d3fd8fd963a9ad669a5029b",
 }
 
 STYLE_ALIASES = {
@@ -40,7 +40,10 @@ STYLE_ALIASES = {
 }
 
 
-class NormFormYamlLoader(yaml.SafeLoader):
+_BaseYamlLoader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
+
+class NormFormYamlLoader(_BaseYamlLoader):
     """Preserve Norwegian words such as 'no'/'NO' as strings while accepting true/false booleans."""
 
 
@@ -58,9 +61,35 @@ def _construct_normform_bool(
 NormFormYamlLoader.add_constructor("tag:yaml.org,2002:bool", _construct_normform_bool)
 
 
-def load_yaml(text: str) -> Any:
+def _strip_virtual_linguist_block(text: str) -> str:
+    """Strip large _virtual_linguist audit provenance blocks before runtime YAML parsing."""
+    marker = "\n_virtual_linguist:\n"
+    start = text.find(marker)
+    if start == -1:
+        if text.startswith("_virtual_linguist:\n"):
+            start = 0
+        else:
+            return text
+    else:
+        start += 1  # point at '_virtual_linguist:'
+    # Find the next top-level YAML key (starts at column 0, not ' ' or '#' or '-')
+    pos = start + len("_virtual_linguist:\n")
+    n = len(text)
+    while pos < n:
+        nl = text.find("\n", pos)
+        if nl == -1:
+            return text[:start]
+        next_pos = nl + 1
+        if next_pos < n and text[next_pos] not in (" ", "\t", "#", "\n", "\r", "-"):
+            return text[:start] + text[next_pos:]
+        pos = next_pos
+    return text[:start]
+
+
+def load_yaml(text: str, *, include_provenance: bool = False) -> Any:
     """Parse YAML safely without turning Norwegian words like 'no' into booleans."""
-    return yaml.load(text, Loader=NormFormYamlLoader)
+    payload = text if include_provenance else _strip_virtual_linguist_block(text)
+    return yaml.load(payload, Loader=NormFormYamlLoader)
 
 
 def yaml_choice_scalar(value: str) -> str:
@@ -215,17 +244,21 @@ def resolve_style_path(
         ) from exc
 
 
-def load_seed_cache(cache_path: Path | None) -> dict[str, str]:
+def load_seed_cache(
+    cache_path: Path | None, *, _preloaded_data: Any = None
+) -> dict[str, str]:
     """Load human-readable YAML or JSON cache into canonical lowercase dict."""
-    if cache_path is None or not cache_path.is_file():
-        return {}
-
-    content = cache_path.read_text(encoding="utf-8")
-    data = (
-        load_yaml(content)
-        if cache_path.suffix in (".yaml", ".yml")
-        else json.loads(content)
-    )
+    if _preloaded_data is not None:
+        data = _preloaded_data
+    else:
+        if cache_path is None or not cache_path.is_file():
+            return {}
+        content = cache_path.read_text(encoding="utf-8")
+        data = (
+            load_yaml(content)
+            if cache_path.suffix in (".yaml", ".yml")
+            else json.loads(content)
+        )
     raw_choices = data.get("choices", data) if isinstance(data, dict) else {}
 
     canonical: dict[str, str] = {}
@@ -258,17 +291,21 @@ def load_seed_cache(cache_path: Path | None) -> dict[str, str]:
     return canonical
 
 
-def load_invalid_pairs(cache_path: Path | None) -> dict[tuple[str, ...], str]:
+def load_invalid_pairs(
+    cache_path: Path | None, *, _preloaded_data: Any = None
+) -> dict[tuple[str, ...], str]:
     """Load entries that preserve the source token instead of choosing a form."""
-    if cache_path is None or not cache_path.is_file():
-        return {}
-
-    content = cache_path.read_text(encoding="utf-8")
-    data = (
-        load_yaml(content)
-        if cache_path.suffix in (".yaml", ".yml")
-        else json.loads(content)
-    )
+    if _preloaded_data is not None:
+        data = _preloaded_data
+    else:
+        if cache_path is None or not cache_path.is_file():
+            return {}
+        content = cache_path.read_text(encoding="utf-8")
+        data = (
+            load_yaml(content)
+            if cache_path.suffix in (".yaml", ".yml")
+            else json.loads(content)
+        )
     if not isinstance(data, dict):
         return {}
     raw_pairs = data.get("invalid_pairs", {})
@@ -303,10 +340,10 @@ def load_style_profile(
     content = path.read_text(encoding="utf-8")
     data = load_yaml(content) if path.suffix in (".yaml", ".yml") else json.loads(content)
     metadata = data.get("_metadata", {}) if isinstance(data, dict) else {}
-    invalid_pairs = load_invalid_pairs(path)
+    invalid_pairs = load_invalid_pairs(path, _preloaded_data=data)
     choices = {
         key: choice
-        for key, choice in load_seed_cache(path).items()
+        for key, choice in load_seed_cache(path, _preloaded_data=data).items()
         if not is_invalid_pair(key.split("\x1f"), invalid_pairs)
     }
     raw_words = metadata.get("prompt_words", [])

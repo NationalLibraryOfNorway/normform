@@ -16,6 +16,7 @@ from typing import Any, Iterator, Sequence
 import yaml
 
 from .audit import extract_changed_alternatives
+from .categories import organize_choices_by_category
 from .contract import Template, clean_direct, parse
 from .harness import parse_prompt_words, split_sentences
 from .model import DEFAULT_MODEL_BY_LANG, load_adapter, model_revision
@@ -305,8 +306,9 @@ def export_sealed_cache(
                 file=sys.stderr,
             )
 
-    changed_entries = []
-    unchanged_entries = []
+    raw_entries: list[dict[str, Any]] = []
+    changed_count = 0
+    unchanged_count = 0
 
     for cands, chosen in canonical_choices.items():
         disp = key_to_display.get(cands, " | ".join(cands))
@@ -319,29 +321,41 @@ def export_sealed_cache(
             change_rate = 100.0 * tot_chg / seen if seen else 0.0
             detail_strs = [f"{word}: {count}" for word, count in details if count > 0]
             detail_part = f" ({', '.join(detail_strs)})" if detail_strs else ""
-            comment = (
-                f"  # seen: {seen}, changed: {tot_chg}{detail_part}, "
+            stats_comment = (
+                f"seen: {seen}, changed: {tot_chg}{detail_part}, "
                 f"already_correct: {already_correct}, change_rate: {change_rate:.2f}%"
             )
         else:
             tot_chg = group_total_changes.get(cands, 0)
+            seen = tot_chg
             details = group_change_stats.get(cands, [])
             detail_strs = [f"{w}: {c}" for w, c in details if c > 0]
-            comment = (
-                f"  # changed: {tot_chg} ({', '.join(detail_strs)})"
-                if detail_strs
-                else f"  # changed: {tot_chg}"
-            )
+            if tot_chg > 0:
+                stats_comment = (
+                    f"changed: {tot_chg} ({', '.join(detail_strs)})"
+                    if detail_strs
+                    else f"changed: {tot_chg}"
+                )
+            else:
+                stats_comment = ""
 
         if tot_chg > 0:
-            changed_entries.append((tot_chg, disp, chosen, comment))
+            changed_count += 1
         else:
-            unchanged_entries.append(
-                (disp, chosen, comment if exact is not None else "")
-            )
+            unchanged_count += 1
 
-    changed_entries.sort(key=lambda item: -item[0])
-    unchanged_entries.sort(key=lambda item: item[0].lower())
+        raw_entries.append(
+            {
+                "cands": cands,
+                "disp": disp,
+                "chosen": chosen,
+                "seen": seen,
+                "changed": tot_chg,
+                "stats_comment": stats_comment,
+            }
+        )
+
+    sections = organize_choices_by_category(raw_entries, lang=lang)
 
     pct_changed = (
         (total_changed / max(1, total_scanned)) * 100.0 if total_scanned else 0.0
@@ -352,8 +366,9 @@ def export_sealed_cache(
         updated_meta["total_records_changed"] = (
             f"{total_changed:,} ({pct_changed:.2f}%)"
         )
-    updated_meta["changed_choices_count"] = len(changed_entries)
-    updated_meta["unchanged_choices_count"] = len(unchanged_entries)
+    updated_meta["changed_choices_count"] = changed_count
+    updated_meta["unchanged_choices_count"] = unchanged_count
+    updated_meta["sort_order"] = "grammatical_category_and_stem_family_then_frequency"
     if invalid_pairs:
         updated_meta["invalid_pairs_count"] = len(invalid_pairs)
     if decision_stats is not None:
@@ -380,12 +395,13 @@ def export_sealed_cache(
     with output_path.open("w", encoding="utf-8") as f:
         f.write("# ====================================================================\n")
         f.write("# NormForm Completed & Sealed Style Cache (Unified & Human-Editable)\n")
-        f.write(f"# Language: {metadata.get('language', 'nob')}\n")
+        f.write(f"# Language: {metadata.get('language', lang)}\n")
         f.write(f"# Sealed at: {metadata.get('sealed_at', '')}\n")
         f.write(
             f"# Total Choices: {len(canonical_choices):,} "
-            f"({len(changed_entries):,} changed in corpus, {len(unchanged_entries):,} reference)\n"
+            f"({changed_count:,} changed in corpus, {unchanged_count:,} reference)\n"
         )
+        f.write("# Organization: Grammatical Category & Stem Family -> Frequency (changed, seen)\n")
         f.write("# ====================================================================\n\n")
 
         f.write(
@@ -395,15 +411,20 @@ def export_sealed_cache(
             + "\n\nchoices:\n"
         )
 
-        if changed_entries:
-            f.write("  # --- CHANGED CHOICES (Sorted by Corpus Impact) ---\n")
-            for _, disp, chosen, comment in changed_entries:
-                f.write(f"  {disp}: {yaml_choice_scalar(chosen)}{comment}\n")
+        for section in sections:
+            f.write(
+                f"\n  # =========================================================================\n"
+                f"  # {section['category_order']}. {section['category_title']}\n"
+                f"  #    Entries: {section['total_entries']:,} | Changed: {section['total_changed']:,} | Seen: {section['total_seen']:,}\n"
+                f"  # =========================================================================\n"
+            )
+            for row in section["rows"]:
+                if row.get("subheader"):
+                    f.write(f"\n  # {row['subheader']}\n")
+                f.write(
+                    f"  {yaml_choice_scalar(row['disp'])}: {yaml_choice_scalar(row['chosen'])}{row['comment']}\n"
+                )
 
-        if unchanged_entries:
-            f.write("\n  # --- UNCHANGED / REFERENCE CHOICES (Alphabetical) ---\n")
-            for disp, chosen, comment in unchanged_entries:
-                f.write(f"  {disp}: {yaml_choice_scalar(chosen)}{comment}\n")
         if invalid_pairs:
             display = {
                 " | ".join(invalid_pair_signature(key)): reason

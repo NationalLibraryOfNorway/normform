@@ -12,6 +12,12 @@ from .batch import (
     render_cached_template,
     run_batch_standardization,
 )
+from .categories import (
+    CATEGORY_META,
+    CategoryClassification,
+    classify_candidate_group,
+    organize_choices_by_category,
+)
 from .contract import (
     DIRECT_TASK,
     PROHIBITED,
@@ -64,10 +70,12 @@ from .styles import (
     resolve_style_path,
 )
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 __all__ = [
     "CACHE_SCHEMA",
+    "CATEGORY_META",
+    "CategoryClassification",
     "ChoiceCache",
     "DEFAULT_MODEL_BY_LANG",
     "DEFAULT_MODEL_ID",
@@ -94,6 +102,7 @@ __all__ = [
     "Template",
     "canonical_choice_key",
     "choice_key",
+    "classify_candidate_group",
     "clean_direct",
     "export_sealed_cache",
     "extract_approximate_cache_usage",
@@ -110,6 +119,7 @@ __all__ = [
     "load_style_profile",
     "load_yaml",
     "model_revision",
+    "organize_choices_by_category",
     "parse",
     "parse_prompt_words",
     "pinned_model_identifier",

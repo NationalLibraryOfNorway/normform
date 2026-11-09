@@ -228,26 +228,40 @@ normform batch \
 
 #### Inspecting the Sealed Cache (`*_sealed_cache.yaml`) & Iterative Refinement
 
-Every `normform batch` run automatically writes a `*_sealed_cache.yaml` file sorted by how many times each morphological choice actually modified tokens in your corpus (`changed` descending, then `seen` descending):
+Every `normform batch` run automatically writes a `*_sealed_cache.yaml` file organized by **grammatical word-class category** (and by **root stem family** for lexical/stem variants), and sorted within each category/family by actual corpus change impact (`changed` descending, then `seen` descending):
 
 ```yaml
 _metadata:
-  description: NormForm Sealed Morphological Style Cache
-  total_entries: 33412
-  seed_entries: 33221
-  newly_discovered: 191
-  prompt_words: [jenta, boka, klokka, tida, uka, lista, kasta, skada, fram, sju]
-  sort_order: changed_desc_then_seen_desc
+  language: nob
+  sort_order: grammatical_category_and_stem_family_then_frequency
 choices:
-  boka | boken: boka  # seen: 1842, changed: 1410, already_correct: 432, change_rate: 76.5% [seed]
-  kasta | kastet: kastet  # seen: 920, changed: 615, already_correct: 305, change_rate: 66.8% [seed]
-  klokka | klokken: klokken  # seen: 540, changed: 488, already_correct: 52, change_rate: 90.4% [seed]
-   Spesialboka | Spesialboken: spesialboka  # seen: 14, changed: 11, already_correct: 3, change_rate: 78.6% [NEW]
+  # =========================================================================
+  # 2. VERB — Weak Preterite & Past Participle (-a / -et / -d / -de / -te)
+  # =========================================================================
+  skada | skadd | skadet: skadet  # [VERB.Past/PerfPart] seen: 1563, changed: 1420 (skadd: 1410, skada: 10), already_correct: 143, change_rate: 90.85%
+  kasta | kastet: kastet  # [VERB.Past/PerfPart] seen: 739, changed: 20 (kasta: 20), already_correct: 719, change_rate: 2.71%
+
+  # =========================================================================
+  # 4. NOUN — Feminine / Common Definite Singular (-a / -en)
+  # =========================================================================
+  boka | boken: boka  # [NOUN.Fem.Sing.Def] seen: 1842, changed: 1410, already_correct: 432, change_rate: 76.5%
+  klokka | klokken: klokken  # [NOUN.Fem.Sing.Def] seen: 540, changed: 488, already_correct: 52, change_rate: 90.4%
+
+  # =========================================================================
+  # 12. LEXICAL & STEM VARIANTS (Grouped by Root Family, then Frequency)
+  # =========================================================================
+  # --- Stem family: fram / frem (525 entries, changed: 6,100, seen: 31,332) ---
+  fram | frem: fram  # [STEM:fram/frem] seen: 20464, changed: 1445 (frem: 1323, Frem: 122), already_correct: 19019, change_rate: 7.06%
+  framtida | framtiden | fremtida | fremtiden: framtida  # [STEM:fram/frem + NOUN.Fem.Sing.Def] seen: 1707, changed: 1180, already_correct: 527, change_rate: 69.13%
+
+  # --- Stem family: sjuk / syk (631 entries, changed: 1,975, seen: 17,008) ---
+  sjuk | syk: syk  # [STEM:sjuk/syk] seen: 520, changed: 45, already_correct: 475, change_rate: 8.65%
+  sjukehuset | sykehuset: sjukehuset  # [STEM:sjuk/syk] seen: 1502, changed: 562 (sykehuset: 552, Sykehuset: 10), already_correct: 940, change_rate: 37.42%
 ```
 
 **Recommended Corpus Curation Workflow ("Run $\rightarrow$ Inspect $\rightarrow$ Lock"):**
 1. Run `normform batch` on your corpus (or a 10,000-record sample with `--limit 10000`).
-2. Open `*_sealed_cache.yaml` and search for `[NEW]` to inspect newly discovered compound words, or review the top rows with the highest `changed:` counts.
+2. Open `*_sealed_cache.yaml` and review each grammatical category section (`VERB — Infinitive`, `VERB — Weak Preterite & Past Participle`, `NOUN — Feminine / Common Definite Singular`, `NOUN — Neuter Indefinite Plural`, `LEXICAL & STEM VARIANTS`) where high-impact choices sit at the top of each section.
 3. Edit any choice in `*_sealed_cache.yaml` (or move a domain-specific collision into `invalid_pairs`), and re-run with `--style my_reviewed_sealed_cache.yaml --preserve-unreviewed` for 100% deterministic corpus standardization.
 
 #### Python API for Batch Standardization
@@ -455,17 +469,17 @@ All official models and style repositories are publicly available on Hugging Fac
 
 | Language | Two-Task Neural Model (`T5Gemma2`) | Official Style Dataset Repository | Built-in CLI Aliases |
 | :--- | :--- | :--- | :--- |
-| **Bokmål (`nob`)** | [`NbAiLab/normform-bokmaal-multitask`](https://huggingface.co/NbAiLab/normform-bokmaal-multitask)<br>`@bdd18aac37718bd1d313f7adbaada7366ca84d12` | [`NbAiLab/normform-bokmaal-redaksjonsnorm`](https://huggingface.co/datasets/NbAiLab/normform-bokmaal-redaksjonsnorm)<br>`@8542693a8e5fe5e7294e0cee1c87019344bec03d` | `redaksjonsnorm`, `redaksjonsstil`, `bokmaal-redaksjonsnorm`, `bokmaal`, `nob` |
-| **Nynorsk (`nno`)** | [`NbAiLab/normform-nynorsk-multitask`](https://huggingface.co/NbAiLab/normform-nynorsk-multitask)<br>`@1453a74d1d7ba8e9816d69a30c960437a0923484` | [`NbAiLab/normform-nynorsk-nasjonalbiblioteknorm`](https://huggingface.co/datasets/NbAiLab/normform-nynorsk-nasjonalbiblioteknorm)<br>`@ceaa918476e2ffcba477964922b580c1c19feb71` | `nasjonalbiblioteknorm`, `nasjonalbibliotekstil`, `nynorsk-nasjonalbiblioteknorm`, `nynorsk`, `nno` |
+| **Bokmål (`nob`)** | [`NbAiLab/normform-bokmaal-multitask`](https://huggingface.co/NbAiLab/normform-bokmaal-multitask)<br>`@bdd18aac37718bd1d313f7adbaada7366ca84d12` | [`NbAiLab/normform-bokmaal-redaksjonsnorm`](https://huggingface.co/datasets/NbAiLab/normform-bokmaal-redaksjonsnorm)<br>`@ca6c55540cc32bf35fb5c1e89f141cdf5f86cd8f` | `redaksjonsnorm`, `redaksjonsstil`, `bokmaal-redaksjonsnorm`, `bokmaal`, `nob` |
+| **Nynorsk (`nno`)** | [`NbAiLab/normform-nynorsk-multitask`](https://huggingface.co/NbAiLab/normform-nynorsk-multitask)<br>`@1453a74d1d7ba8e9816d69a30c960437a0923484` | [`NbAiLab/normform-nynorsk-nasjonalbiblioteknorm`](https://huggingface.co/datasets/NbAiLab/normform-nynorsk-nasjonalbiblioteknorm)<br>`@33d0403d721ecfea2d3fd8fd963a9ad669a5029b` | `nasjonalbiblioteknorm`, `nasjonalbibliotekstil`, `nynorsk-nasjonalbiblioteknorm`, `nynorsk`, `nno` |
 
 ### Linguistic Summary of the Official Style Profiles
 
-- **Bokmål — `NbAiLab/normform-bokmaal-redaksjonsnorm` (33,221 reviewed choices, 200 `invalid_pairs`)**:
+- **Bokmål — `NbAiLab/normform-bokmaal-redaksjonsnorm` (76,979 reviewed choices, 3,857 `invalid_pairs`)**:
   - **Feminine nouns**: Uses `-a` for concrete/everyday feminine nouns (`boka`, `jenta`, `hylla`, `katta`, `tida`, `uka`, `lista`, `helga`), while selecting `-en` for specific editorial nouns (`klokken`, `avisen`, `gruppen`, `grensen`).
   - **Verbs**: Uses `-et` in the preterite and past participle of weak `-e` verbs (`kastet`, `laget`, `skadet`, `snakket`) and `stod` (`sto | stod`).
   - **Neuter plurals**: Uses short indefinite plural (`produkt`, `resultat`, `prosjekt`, `dokument`) and `-ene` in definite plural (`husene`, `årene`, `barna`).
   - **Lexical variants**: Uses `fram` / `framover` / `framtida`, `utafor`, `innenfor`, `sju` / `tjuende`, `sjukehuset`, and `syk`.
-- **Nynorsk — `NbAiLab/normform-nynorsk-nasjonalbiblioteknorm` (12,487 reviewed choices, 19 `invalid_pairs`)**:
+- **Nynorsk — `NbAiLab/normform-nynorsk-nasjonalbiblioteknorm` (14,665 reviewed choices, 1,293 `invalid_pairs`)**:
   - **Infinitives**: Consistent `-a` infinitive (`vera`, `bruka`, `gjera`, `halda`, `koma`, `setja`, `skriva`).
   - **Pronouns & function words**: `vi` (`me | vi`), `no` (`no | nå`), `difor` (`derfor | difor`), `blant` (`blant | millom`), `ikkje`.
   - **Nouns, adjectives & verbs**: `fyrst` / `fyrste`, `sundag` / `sundagen`, `ynskja` / `ynskjer`, `gje` / `gjev`, `vart` (`blei | vart`), definite feminine plural `-ene` (`bøkene`, `jentene`, `hendene`), and vowel alternation in strong/irregular verbs (`kjem`, `fer`, `held`, `tek`).

@@ -11,6 +11,7 @@ from normform import (
     DocumentHarness,
     StyleProfile,
     canonical_choice_key,
+    classify_candidate_group,
     clean_direct,
     export_sealed_cache,
     extract_changed_alternatives,
@@ -21,6 +22,7 @@ from normform import (
     load_seed_cache,
     load_style_profile,
     load_yaml,
+    organize_choices_by_category,
     parse,
     render_cached_template,
     resolve,
@@ -235,3 +237,66 @@ def test_split_sentences_and_forced_choice() -> None:
     spans = split_sentences("Hei! Hvordan går det? Bra.")
     assert [s.text.strip() for s in spans] == ["Hei!", "Hvordan går det?", "Bra."]
     assert forced_choice(("boka", "boken"), ["Boka"]) == "boka"
+
+
+def test_grammatical_and_stem_family_categorization() -> None:
+    c_noun = classify_candidate_group(("boka", "boken"), lang="nob")
+    assert c_noun.category_id == "NOUN_FEM_DEF_SG"
+    assert c_noun.tag == "NOUN.Fem.Sing.Def"
+
+    c_verb = classify_candidate_group(("kasta", "kastet"), lang="nob")
+    assert c_verb.category_id == "VERB_PAST_PART"
+    assert c_verb.tag == "VERB.Past/PerfPart"
+
+    c_nno_inf = classify_candidate_group(("bruka", "bruke"), lang="nno")
+    assert c_nno_inf.category_id == "VERB_INF"
+    assert c_nno_inf.tag == "VERB.Inf"
+
+    c_stem = classify_candidate_group(("sjukehuset", "sykehuset"), lang="nob")
+    assert c_stem.category_id == "LEXICAL_STEM"
+    assert c_stem.stem_family == ("sjuk", "syk")
+    assert c_stem.tag == "STEM:sjuk/syk"
+
+    c_combined = classify_candidate_group(
+        ("framtida", "framtiden", "fremtida", "fremtiden"), lang="nob"
+    )
+    assert c_combined.category_id == "LEXICAL_STEM"
+    assert c_combined.stem_family == ("fram", "frem")
+    assert c_combined.tag == "STEM:fram/frem + NOUN.Fem.Sing.Def"
+
+    sections = organize_choices_by_category(
+        [
+            {
+                "cands": ("sjukehuset", "sykehuset"),
+                "disp": "sjukehuset | sykehuset",
+                "chosen": "sjukehuset",
+                "seen": 100,
+                "changed": 80,
+                "stats_comment": "seen: 100, changed: 80",
+            },
+            {
+                "cands": ("sjuk", "syk"),
+                "disp": "sjuk | syk",
+                "chosen": "syk",
+                "seen": 50,
+                "changed": 10,
+                "stats_comment": "seen: 50, changed: 10",
+            },
+            {
+                "cands": ("boka", "boken"),
+                "disp": "boka | boken",
+                "chosen": "boka",
+                "seen": 200,
+                "changed": 150,
+                "stats_comment": "seen: 200, changed: 150",
+            },
+        ],
+        lang="nob",
+    )
+    assert [s["category_id"] for s in sections] == ["NOUN_FEM_DEF_SG", "LEXICAL_STEM"]
+    # Simplex root 'sjuk | syk' is listed first inside its stem family block
+    assert [r["disp"] for r in sections[1]["rows"]] == [
+        "sjuk | syk",
+        "sjukehuset | sykehuset",
+    ]
+
