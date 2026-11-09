@@ -37,6 +37,8 @@ class FakeAdapter:
         mapping = {
             "Jenta hoppa høyt.": "[Jenta|Jenten] [hoppa|hoppet] høyt.",
             "Boka lå på bordet.": "[Boka|Boken] lå på bordet.",
+            "Jeg leste boka.": "Jeg leste [boka|boken].",
+            "Jeg leste boken.": "Jeg leste [boka|boken].",
             "Boken var ny.": "[Boka|Boken] var ny.",
             "Han så et band.": "Han så et [band|bånd].",
         }
@@ -177,12 +179,14 @@ def test_audit_inconsistencies_and_stats(tmp_path: Path) -> None:
     harness = DocumentHarness(FakeAdapter(), cache)
     records = [
         {"text": "Boka lå på bordet."},
-        {"text": "Boken var ny."},
+        {"text": "Jeg leste boka."},
+        {"text": "Jeg leste boken."},
     ]
     issues = find_inconsistencies(records, harness, [], raw_mode=True)
     assert len(issues) == 1
+    assert issues[0]["candidate_group"] == ["boka", "boken"]
     assert issues[0]["first_occurrence"]["choice"] == "Boka"
-    assert issues[0]["inconsistent_occurrence"]["choice"] == "Boken"
+    assert issues[0]["inconsistent_occurrence"]["choice"] == "boken"
 
     corpus_file = tmp_path / "corpus.jsonl"
     corpus_file.write_text(

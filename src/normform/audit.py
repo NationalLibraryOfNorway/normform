@@ -67,13 +67,15 @@ def find_inconsistencies(
                     continue
 
             for grp_idx, candidates in enumerate(template.groups):
-                key = choice_key(candidates)
+                canonical_cands = [c.lower() for c in candidates]
+                key = choice_key(canonical_cands)
                 choice = choices[grp_idx]
 
                 if key not in history:
                     history[key] = {
                         "choice": choice,
-                        "candidates": list(candidates),
+                        "choice_lower": choice.lower(),
+                        "candidates": canonical_cands,
                         "record_index": rec_idx,
                         "sentence_index": sent_idx,
                         "original_text": span.text,
@@ -81,10 +83,10 @@ def find_inconsistencies(
                     }
                 else:
                     prev = history[key]
-                    if prev["choice"] != choice:
+                    if prev["choice_lower"] != choice.lower():
                         inconsistencies.append(
                             {
-                                "candidate_group": list(candidates),
+                                "candidate_group": canonical_cands,
                                 "group_key": key,
                                 "first_occurrence": {
                                     "choice": prev["choice"],

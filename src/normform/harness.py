@@ -942,6 +942,37 @@ class Standardizer:
             parts.append(leading + str(res.get("text", core)) + trailing)
         return "".join(parts)
 
+    def audit(
+        self,
+        text_or_records: str | Sequence[dict[str, Any]],
+        *,
+        raw: bool = True,
+        use_cache: bool = True,
+        prompt_words: Sequence[str] | str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Check text or records for internal sub-norm morphological inconsistencies."""
+        from .audit import find_inconsistencies
+
+        if isinstance(text_or_records, str):
+            records: list[dict[str, Any]] = [{"text": text_or_records}]
+        else:
+            records = list(text_or_records)
+
+        harness = DocumentHarness(
+            self.adapter,
+            self.cache,
+            style_profile=self.style_profile,
+            preserve_unreviewed=self.preserve_unreviewed,
+            debug=self.debug,
+        )
+        return find_inconsistencies(
+            records,
+            harness,
+            parse_prompt_words(prompt_words),
+            use_cache=use_cache,
+            raw_mode=raw,
+        )
+
 
 __all__ = [
     "CACHE_SCHEMA",

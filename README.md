@@ -90,6 +90,9 @@ normform standardize -t "Me køyrde heim på laurdag." --lang nno --style nasjon
 # 3. Generate [alt1|alt2] morphological alternative brackets:
 normform alternatives -t "Katta ligger på matta." --lang nob
 # -> [Katta|Katten] ligger på [matta|matten].
+
+# 4. Check a document for internal sub-norm inconsistencies (without modifying it):
+normform audit -i manuscript.txt --lang nob --raw
 ```
 
 ### Python API
@@ -114,6 +117,12 @@ print(text)
 bracketed = std.alternatives("Katta ligger på matta.")
 print(bracketed)
 # -> "[Katta|Katten] ligger på [matta|matten]."
+
+# 3. Check a text or document for internal sub-norm inconsistencies:
+issues = std.audit("Boka lå på bordet. Senere leste jeg boken.", raw=True)
+for issue in issues:
+    print(issue["candidate_group"], "->", issue["first_occurrence"]["choice"], "vs", issue["inconsistent_occurrence"]["choice"])
+# -> ['boka', 'boken'] -> Boka vs boken
 ```
 
 ---
@@ -229,15 +238,29 @@ normform alternatives -i references.jsonl -o references_with_alternatives.jsonl 
 
 ---
 
-### 4.4 Auditing Inconsistencies & Change Statistics (`normform audit`)
+### 4.4 Auditing Internal Sub-Norm Consistency & Change Statistics (`normform audit`)
 
-`normform audit` supports three complementary auditing workflows:
+A very common use case for NormForm is **checking whether a document, book, or corpus is internally consistent in its sub-norm choices**—without rewriting the text.
 
-#### A. Raw Source Text Inconsistency Audit (`--raw`)
-Checks whether a raw document or corpus mixes competing morphological variants of the same candidate group (e.g., uses `boka` 14 times and `boken` 3 times in the same text):
+For example, an author or transcription dataset might unintentionally mix `boka` and `boken`, `fram` and `frem`, or `kasta` and `kastet` across different paragraphs. Because `normform audit` compares morphological choices case-insensitively across contextually validated `[alt1|alt2]` slots, sentence-initial capitalization (`Boka` vs. `boka`) is treated as consistent, while actual sub-norm switches (`Boka` vs. `boken`) are flagged with exact record and sentence locations.
+
+#### A. Check a Raw Document or Corpus for Internal Sub-Norm Inconsistencies (`--raw`)
 
 ```bash
+# Human-readable terminal report of all internal sub-norm inconsistencies:
 normform audit -i manuscript.txt --lang nob --raw
+
+# Export a structured JSON report of every inconsistency and its sentence context:
+normform audit -i corpus.jsonl --lang nob --raw --json -o inconsistencies.json
+```
+
+In Python:
+```python
+from normform import Standardizer
+
+std = Standardizer(lang="nob")
+issues = std.audit("Boka lå på bordet. Jeg leste boka. Senere tok jeg boken.", raw=True)
+# Returns a list of dicts with 'candidate_group', 'first_occurrence', and 'inconsistent_occurrence'
 ```
 
 #### B. Model & Style Consistency Audit (`--uncached`)
