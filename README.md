@@ -5,7 +5,7 @@
 
 **NormForm** is a Python toolkit and command-line interface for **context-aware Norwegian morphological standardization, alternative generation, and style auditing** in both **Bokmål (`nob`)** and **Nynorsk (`nno`)**.
 
-Written Norwegian officially permits wide intra-norm morphological and orthographic variation—such as feminine vs. common gender nouns (`boka` / `boken`), weak preterite endings (`kasta` / `kastet`), neuter plural endings (`husene` / `husa`), and lexical spelling variants (`fram` / `frem`, `sjuk` / `syk`, `no` / `nå`). NormForm lets you:
+Written Norwegian officially permits wide intra-norm morphological and orthographic variation—such as feminine vs. common gender nouns (`boka` / `boken`, `klokka` / `klokken`), weak preterite endings (`kasta` / `kastet`), infinitive endings in Nynorsk (`bruka` / `bruke`, `gjera` / `gjere`), and lexical spelling variants (`fram` / `frem`, `sjukehuset` / `sykehuset`, `fyrste` / `første`). NormForm lets you:
 
 1. **Standardize text or large corpora** to a consistent sub-norm style (such as *Bokmål Redaksjonsnorm*, *Nynorsk Nasjonalbiblioteknorm*, or your own custom style profile).
 2. **Generate `[alt1|alt2]` morphological alternative brackets** for speech recognition (ASR) and text generation evaluation with [`altmetrics`](https://pypi.org/project/altmetrics/) and [`altwer`](https://pypi.org/project/altwer/).
@@ -38,12 +38,12 @@ Written Norwegian officially permits wide intra-norm morphological and orthograp
 NormForm is built around a **strict non-destructive lattice contract** ([`normform.contract`](src/normform/contract.py)). The neural model is never allowed to freely rewrite your text. Instead, every sentence is parsed into a verified template of literal spans and `[alt1|alt2]` candidate slots (`Template.align`), and only validated candidate slots can change.
 
 ### What NormForm DOES:
-- **Chooses consistently among valid intra-norm alternatives in context**: e.g., selecting `boken` from `[boka|boken]`, `kastet` from `[kasta|kastet]`, or `frem` from `[fram|frem]` according to your chosen style profile.
+- **Chooses consistently among valid intra-norm alternatives in context**: e.g., in *Bokmål Redaksjonsnorm*, selecting `jenta` and `boka` for concrete feminine nouns, `klokken` for `klokka | klokken`, `kastet` for weak preterites (`kasta | kastet`), and `utafor` / `sjukehuset` for lexical variants; or in *Nynorsk Nasjonalbiblioteknorm*, selecting `-a` infinitives (`bruka`, `gjera`, `vera`), `vi`, `fyrste`, and `sundagen`.
 - **Guarantees byte-for-byte preservation of all non-alternative text**: punctuation, whitespace, line breaks, numbers, dates, URLs, email addresses, proper names, and out-of-vocabulary words are never altered.
 - **Preserves source token casing automatically**:
-  - Lowercase: `boka` $\rightarrow$ `boken`
-  - Titlecase (sentence-initial): `Boka` $\rightarrow$ `Boken`
-  - Uppercase: `BOKA` $\rightarrow$ `BOKEN`
+  - Lowercase: `jenten` $\rightarrow$ `jenta`
+  - Titlecase (sentence-initial): `Jenten` $\rightarrow$ `Jenta`
+  - Uppercase: `JENTEN` $\rightarrow$ `JENTA`
   - Mixed internal capitals: `vebb-TV` $\rightarrow$ `web-TV`
 - **Protects homographs and semantic collisions (`invalid_pairs`)**: When two surface forms can overlap in inflection tables but differ in meaning or grammatical role (e.g., `verken | verket` *"neither"* vs. *"the pain/work"*, `bad | badet`, `slott | slåss`), the style profile's `invalid_pairs` guard forces NormForm to preserve the original token unchanged.
 - **Maintains document- and corpus-level consistency**: Once a candidate group (`boka | boken`) is resolved—either from a reviewed style cache or by the neural style model—that exact decision is cached and applied consistently across every occurrence.
@@ -54,6 +54,17 @@ NormForm is built around a **strict non-destructive lattice contract** ([`normfo
 - **Does NOT paraphrase, reorder words, or insert/delete tokens**: Every output sentence is guaranteed to align 1-to-1 with the source sentence's literal template.
 - **Does NOT rewrite syntactic agreement across neighboring tokens**: NormForm substitutes individual morphological word slots (`[boka|boken]`). It does not rewrite surrounding articles or adjectives outside the candidate slot (e.g., if a source phrase has `ei lita bok`, individual word slots are only changed where each slot's own paradigm allows it).
 - **Does NOT use brittle suffix-stripping heuristics on compounds**: Novel compound words absent from the seed cache are either resolved in full sentential context by the neural model or preserved unchanged when `--preserve-unreviewed` is enabled.
+
+### Concrete Examples: What Changes vs. What Stays Untouched
+
+| Scenario | Input Text | Output (`--style redaksjonsnorm` / `nasjonalbiblioteknorm`) | Why? |
+| :--- | :--- | :--- | :--- |
+| **Bokmål `redaksjonsnorm`** | `"Jenten kasta boken og så på klokka utenfor sykehuset."` | `"Jenta kastet boka og så på klokken utafor sjukehuset."` | `redaksjonsnorm` prefers `-a` on concrete feminine nouns (`jenta`, `boka`), `-et` in weak past tense (`kastet`), `klokken`, `utafor`, and `sjukehuset`. |
+| **Nynorsk `nasjonalbiblioteknorm`** | `"Me ønskjer å bruke den første søndagen til å gjere dette."` | `"Vi ynskjer å bruka den fyrste sundagen til å gjera dette."` | `nasjonalbiblioteknorm` uses `-a` infinitives (`bruka`, `gjera`), `vi`, `ynskjer`, `fyrste`, and `sundagen`. |
+| **Homograph / collision guard (`invalid_pairs`)** | `"Han tok verken mat eller drikke."` | `"Han tok verken mat eller drikke."` *(unchanged)* | `verken \| verket` is listed in `invalid_pairs` (conjunction *"neither"* vs. noun *"the pain/work"*), so NormForm never alters it. |
+| **Cross-token agreement boundary** | `"Hun leste ei lita bok."` | `"Hun leste ei lita bok."` *(unchanged)* | Indefinite singular `bok` has no alternative slot, and NormForm never rewrites surrounding articles/adjectives (`ei lita` $\not\rightarrow$ `en liten`) across token boundaries. |
+| **Cross-language input (Nynorsk given to `--lang nob`)** | `"Eg gjekk heim frå skulen."` | `"Eg gjekk heim frå skulen."` *(unchanged)* | NormForm is not a Nynorsk$\leftrightarrow$Bokmål translator; non-target-norm words have no valid target-norm alternative brackets. |
+| **Typos, proper nouns, URLs & dates** | `"Per-Egil besøkte https://nb.no den 17. mai i Осло (skrivefeil: bokk)." ` | `"Per-Egil besøkte https://nb.no den 17. mai i Осло (skrivefeil: bokk)."` *(unchanged)* | Out-of-vocabulary words, typos (`bokk`), names, URLs, and numbers are locked outside `Template` slots and preserved byte-for-byte. |
 
 ---
 
@@ -82,10 +93,12 @@ pip install "normform[batch]"
 normform --version
 
 # 1. Standardize a Bokmål sentence using the official Redaksjonsnorm style:
-normform standardize -t "Jenta kasta ballen og la boka på hylla." --lang nob --style redaksjonsnorm
+normform standardize -t "Jenten kasta boken og så på klokka utenfor sykehuset." --lang nob --style redaksjonsnorm
+# -> Jenta kastet boka og så på klokken utafor sjukehuset.
 
 # 2. Standardize a Nynorsk sentence using Nasjonalbiblioteknorm:
-normform standardize -t "Me køyrde heim på laurdag." --lang nno --style nasjonalbiblioteknorm
+normform standardize -t "Me ønskjer å bruke den første søndagen til å gjere dette." --lang nno --style nasjonalbiblioteknorm
+# -> Vi ynskjer å bruka den fyrste sundagen til å gjera dette.
 
 # 3. Generate [alt1|alt2] morphological alternative brackets:
 normform alternatives -t "Katta ligger på matta." --lang nob
@@ -109,9 +122,9 @@ std = Standardizer(
 )
 
 # 1. Standardize text (preserves casing, punctuation, and layout):
-text = std("Jenta kasta ballen og la boka på hylla.")
+text = std("Jenten kasta boken og så på klokka utenfor sykehuset.")
 print(text)
-# -> "Jenta kastet ballen og la boken på hyllen."
+# -> "Jenta kastet boka og så på klokken utafor sjukehuset."
 
 # 2. Generate [alt1|alt2] morphological alternative brackets:
 bracketed = std.alternatives("Katta ligger på matta.")
@@ -133,18 +146,31 @@ for issue in issues:
 
 Use `normform standardize` for interactive strings, plain-text documents (`.txt`), or small JSONL files (`.jsonl`).
 
+#### Choosing Your Standardization Mode
+
+NormForm supports three ways to control how morphological choices are made:
+
+| Mode | CLI Flags | How Seen Words Are Handled | How Unseen Compounds Are Handled | Best For |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Strict Reviewed Mode** | `--style <style> --preserve-unreviewed` | Uses the human-reviewed choices in `style.yaml` (33k+ Bokmål / 12k+ Nynorsk entries). | **Preserved unchanged** (never calls the style model on unreviewed words). | Strict editorial publishing & zero-surprise corpus runs. |
+| **2. Hybrid Style + Neural Extrapolation** *(Default with `--style`)* | `--style <style>` | Uses the human-reviewed choices in `style.yaml` in $O(1)$ lookup. | Resolved in context by the neural style model (steered by the style's `prompt_words`) and cached for the rest of the run. | Full-coverage corpus standardization where rare compounds should also follow the target style. |
+| **3. Zero-Shot Prompt Steering** | `-p "word1,word2,..."` *(no `--style`)* | Resolved dynamically by the neural model steered by your prompt words and cached per document/run. | Resolved dynamically by the neural model and cached per document/run. | Quick experimentation or matching an ad-hoc style from 5–10 indicator words. |
+
+#### Examples
+
 ```bash
 # Standardize a .txt file with Redaksjonsnorm and write to output.txt:
 normform standardize -i article.txt -o article_standardized.txt --lang nob --style redaksjonsnorm
 
 # Strict reviewed-only mode (never invoke the style model on unseen compounds;
-# only apply the 33,000+ human/linguist-reviewed choices in the style cache):
+# only apply the 33,221 human/linguist-reviewed choices in the style cache):
 normform standardize -i article.txt -o article_standardized.txt \
   --lang nob --style redaksjonsnorm --preserve-unreviewed
 
-# Standardize without a style file by supplying 5-10 steering prompt words:
-normform standardize -t "Jenta hoppa høyt over gjerdet." \
-  --lang nob -p "jenta,kasta,boka,hylla,fram"
+# Standardize toward a conservative Bokmål profile without a style file by supplying steering prompt words:
+normform standardize -t "Jenta kasta boka på hylla." \
+  --lang nob -p "jenten,kastet,boken,hyllen,frem"
+# -> Jenten kastet boken på hyllen.
 
 # Persist choices across multiple runs in a local JSON cache and write a Markdown summary:
 normform standardize -i chapter1.txt -o chapter1_norm.txt \
@@ -200,6 +226,30 @@ normform batch \
   --limit 10000
 ```
 
+#### Inspecting the Sealed Cache (`*_sealed_cache.yaml`) & Iterative Refinement
+
+Every `normform batch` run automatically writes a `*_sealed_cache.yaml` file sorted by how many times each morphological choice actually modified tokens in your corpus (`changed` descending, then `seen` descending):
+
+```yaml
+_metadata:
+  description: NormForm Sealed Morphological Style Cache
+  total_entries: 33412
+  seed_entries: 33221
+  newly_discovered: 191
+  prompt_words: [jenta, boka, klokka, tida, uka, lista, kasta, skada, fram, sju]
+  sort_order: changed_desc_then_seen_desc
+choices:
+  boka | boken: boka  # seen: 1842, changed: 1410, already_correct: 432, change_rate: 76.5% [seed]
+  kasta | kastet: kastet  # seen: 920, changed: 615, already_correct: 305, change_rate: 66.8% [seed]
+  klokka | klokken: klokken  # seen: 540, changed: 488, already_correct: 52, change_rate: 90.4% [seed]
+   Spesialboka | Spesialboken: spesialboka  # seen: 14, changed: 11, already_correct: 3, change_rate: 78.6% [NEW]
+```
+
+**Recommended Corpus Curation Workflow ("Run $\rightarrow$ Inspect $\rightarrow$ Lock"):**
+1. Run `normform batch` on your corpus (or a 10,000-record sample with `--limit 10000`).
+2. Open `*_sealed_cache.yaml` and search for `[NEW]` to inspect newly discovered compound words, or review the top rows with the highest `changed:` counts.
+3. Edit any choice in `*_sealed_cache.yaml` (or move a domain-specific collision into `invalid_pairs`), and re-run with `--style my_reviewed_sealed_cache.yaml --preserve-unreviewed` for 100% deterministic corpus standardization.
+
 #### Python API for Batch Standardization
 
 ```python
@@ -249,9 +299,45 @@ For example, an author or transcription dataset might unintentionally mix `boka`
 ```bash
 # Human-readable terminal report of all internal sub-norm inconsistencies:
 normform audit -i manuscript.txt --lang nob --raw
+```
 
-# Export a structured JSON report of every inconsistency and its sentence context:
+Example terminal output:
+```text
+Found 2 internal sub-norm inconsistencies in manuscript.txt:
+
+  1. [boka | boken]
+     - First choice : 'Boka' (record 0, sentence 0: "Boka lå på bordet hele dagen.")
+     - Conflict     : 'boken' (record 0, sentence 2: "Senere på kvelden leste jeg boken.")
+
+  2. [fram | frem]
+     - First choice : 'fram' (record 1, sentence 0: "Vi gikk fram til scenen.")
+     - Conflict     : 'frem' (record 4, sentence 1: "Hun kom frem i tide.")
+```
+
+Export a structured JSON report for automated QA pipelines:
+```bash
 normform audit -i corpus.jsonl --lang nob --raw --json -o inconsistencies.json
+```
+
+Example JSON structure (`inconsistencies.json`):
+```json
+[
+  {
+    "candidate_group": ["boka", "boken"],
+    "first_occurrence": {
+      "record_index": 0,
+      "sentence_index": 0,
+      "choice": "Boka",
+      "sentence": "Boka lå på bordet hele dagen."
+    },
+    "inconsistent_occurrence": {
+      "record_index": 0,
+      "sentence_index": 2,
+      "choice": "boken",
+      "sentence": "Senere på kvelden leste jeg boken."
+    }
+  }
+]
 ```
 
 In Python:
@@ -260,7 +346,7 @@ from normform import Standardizer
 
 std = Standardizer(lang="nob")
 issues = std.audit("Boka lå på bordet. Jeg leste boka. Senere tok jeg boken.", raw=True)
-# Returns a list of dicts with 'candidate_group', 'first_occurrence', and 'inconsistent_occurrence'
+# Returns the same list of dicts with 'candidate_group', 'first_occurrence', and 'inconsistent_occurrence'
 ```
 
 #### B. Model & Style Consistency Audit (`--uncached`)
@@ -284,8 +370,9 @@ total_records_scanned: 50000
 total_records_changed: 14210 (28.42%)
 unique_alternative_groups_changed: 842
 top_alternatives:
-  fram | frem: {chosen: frem, total_changes: 1204, changed_from: {fram: 1204}}
-  boka | boken: {chosen: boken, total_changes: 618, changed_from: {boka: 618}}
+  boka | boken: {chosen: boka, total_changes: 1410, changed_from: {boken: 1410}}
+  kasta | kastet: {chosen: kastet, total_changes: 615, changed_from: {kasta: 615}}
+  klokka | klokken: {chosen: klokken, total_changes: 488, changed_from: {klokka: 488}}
 ```
 
 ---
@@ -336,16 +423,19 @@ _metadata:
   language: nob
   style_name: my-custom-style
   prompt_words:
-    - boken
+    - jenta
+    - boka
     - kastet
-    - frem
-    - syk
+    - fram
+    - sjukehuset
 
 choices:
   # Mapping from "alt1 | alt2" (lowercase, alphabetical) to the chosen lowercase form:
-  boka | boken: boken
-  fram | frem: frem
+  boka | boken: boka
+  fram | frem: fram
+  jenta | jenten: jenta
   kasta | kastet: kastet
+  klokka | klokken: klokken
   "no | nå": nå
 
 invalid_pairs:
@@ -365,8 +455,20 @@ All official models and style repositories are publicly available on Hugging Fac
 
 | Language | Two-Task Neural Model (`T5Gemma2`) | Official Style Dataset Repository | Built-in CLI Aliases |
 | :--- | :--- | :--- | :--- |
-| **Bokmål (`nob`)** | [`NbAiLab/normform-bokmaal-multitask`](https://huggingface.co/NbAiLab/normform-bokmaal-multitask)<br>`@eb83a85c52bea137e2bbb3ba95e29be3e9476923` | [`NbAiLab/normform-bokmaal-redaksjonsnorm`](https://huggingface.co/datasets/NbAiLab/normform-bokmaal-redaksjonsnorm)<br>`@d3db2d6eb3508d49c8fe3ebb9151f8c6ca8ae0eb` | `redaksjonsnorm`, `redaksjonsstil`, `bokmaal-redaksjonsnorm`, `bokmaal`, `nob` |
-| **Nynorsk (`nno`)** | [`NbAiLab/normform-nynorsk-multitask`](https://huggingface.co/NbAiLab/normform-nynorsk-multitask)<br>`@350cf9d3aeeba2f390353f4147ef2910dff7b0ee` | [`NbAiLab/normform-nynorsk-nasjonalbiblioteknorm`](https://huggingface.co/datasets/NbAiLab/normform-nynorsk-nasjonalbiblioteknorm)<br>`@38253e2ff8b0aa4c15019fafb99bcf10ba33c8ac` | `nasjonalbiblioteknorm`, `nasjonalbibliotekstil`, `nynorsk-nasjonalbiblioteknorm`, `nynorsk`, `nno` |
+| **Bokmål (`nob`)** | [`NbAiLab/normform-bokmaal-multitask`](https://huggingface.co/NbAiLab/normform-bokmaal-multitask)<br>`@bdd18aac37718bd1d313f7adbaada7366ca84d12` | [`NbAiLab/normform-bokmaal-redaksjonsnorm`](https://huggingface.co/datasets/NbAiLab/normform-bokmaal-redaksjonsnorm)<br>`@8542693a8e5fe5e7294e0cee1c87019344bec03d` | `redaksjonsnorm`, `redaksjonsstil`, `bokmaal-redaksjonsnorm`, `bokmaal`, `nob` |
+| **Nynorsk (`nno`)** | [`NbAiLab/normform-nynorsk-multitask`](https://huggingface.co/NbAiLab/normform-nynorsk-multitask)<br>`@1453a74d1d7ba8e9816d69a30c960437a0923484` | [`NbAiLab/normform-nynorsk-nasjonalbiblioteknorm`](https://huggingface.co/datasets/NbAiLab/normform-nynorsk-nasjonalbiblioteknorm)<br>`@ceaa918476e2ffcba477964922b580c1c19feb71` | `nasjonalbiblioteknorm`, `nasjonalbibliotekstil`, `nynorsk-nasjonalbiblioteknorm`, `nynorsk`, `nno` |
+
+### Linguistic Summary of the Official Style Profiles
+
+- **Bokmål — `NbAiLab/normform-bokmaal-redaksjonsnorm` (33,221 reviewed choices, 200 `invalid_pairs`)**:
+  - **Feminine nouns**: Uses `-a` for concrete/everyday feminine nouns (`boka`, `jenta`, `hylla`, `katta`, `tida`, `uka`, `lista`, `helga`), while selecting `-en` for specific editorial nouns (`klokken`, `avisen`, `gruppen`, `grensen`).
+  - **Verbs**: Uses `-et` in the preterite and past participle of weak `-e` verbs (`kastet`, `laget`, `skadet`, `snakket`) and `stod` (`sto | stod`).
+  - **Neuter plurals**: Uses short indefinite plural (`produkt`, `resultat`, `prosjekt`, `dokument`) and `-ene` in definite plural (`husene`, `årene`, `barna`).
+  - **Lexical variants**: Uses `fram` / `framover` / `framtida`, `utafor`, `innenfor`, `sju` / `tjuende`, `sjukehuset`, and `syk`.
+- **Nynorsk — `NbAiLab/normform-nynorsk-nasjonalbiblioteknorm` (12,487 reviewed choices, 19 `invalid_pairs`)**:
+  - **Infinitives**: Consistent `-a` infinitive (`vera`, `bruka`, `gjera`, `halda`, `koma`, `setja`, `skriva`).
+  - **Pronouns & function words**: `vi` (`me | vi`), `no` (`no | nå`), `difor` (`derfor | difor`), `blant` (`blant | millom`), `ikkje`.
+  - **Nouns, adjectives & verbs**: `fyrst` / `fyrste`, `sundag` / `sundagen`, `ynskja` / `ynskjer`, `gje` / `gjev`, `vart` (`blei | vart`), definite feminine plural `-ene` (`bøkene`, `jentene`, `hendene`), and vowel alternation in strong/irregular verbs (`kjem`, `fer`, `held`, `tek`).
 
 ---
 

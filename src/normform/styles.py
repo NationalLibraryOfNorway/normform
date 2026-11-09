@@ -22,17 +22,19 @@ DEFAULT_STYLE_REPOS = {
 }
 
 DEFAULT_STYLE_REVISIONS = {
-    "NbAiLab/normform-bokmaal-redaksjonsnorm": "d3db2d6eb3508d49c8fe3ebb9151f8c6ca8ae0eb",
-    "NbAiLab/normform-nynorsk-nasjonalbiblioteknorm": "38253e2ff8b0aa4c15019fafb99bcf10ba33c8ac",
+    "NbAiLab/normform-bokmaal-redaksjonsnorm": "8542693a8e5fe5e7294e0cee1c87019344bec03d",
+    "NbAiLab/normform-nynorsk-nasjonalbiblioteknorm": "ceaa918476e2ffcba477964922b580c1c19feb71",
 }
 
 STYLE_ALIASES = {
     "redaksjonsnorm": "NbAiLab/normform-bokmaal-redaksjonsnorm",
     "redaksjonsstil": "NbAiLab/normform-bokmaal-redaksjonsnorm",
+    "bokmaal-redaksjonsnorm": "NbAiLab/normform-bokmaal-redaksjonsnorm",
     "bokmaal": "NbAiLab/normform-bokmaal-redaksjonsnorm",
     "nob": "NbAiLab/normform-bokmaal-redaksjonsnorm",
     "nasjonalbiblioteknorm": "NbAiLab/normform-nynorsk-nasjonalbiblioteknorm",
     "nasjonalbibliotekstil": "NbAiLab/normform-nynorsk-nasjonalbiblioteknorm",
+    "nynorsk-nasjonalbiblioteknorm": "NbAiLab/normform-nynorsk-nasjonalbiblioteknorm",
     "nynorsk": "NbAiLab/normform-nynorsk-nasjonalbiblioteknorm",
     "nno": "NbAiLab/normform-nynorsk-nasjonalbiblioteknorm",
 }

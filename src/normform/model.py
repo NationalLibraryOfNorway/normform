@@ -16,9 +16,9 @@ from .contract import DIRECT_TASK, STYLE_RULE, STYLE_TASK, clean_direct, parse
 from .styles import load_yaml
 
 DEFAULT_NOB_MODEL_ID = "NbAiLab/normform-bokmaal-multitask"
-DEFAULT_NOB_MODEL_REVISION = "eb83a85c52bea137e2bbb3ba95e29be3e9476923"
+DEFAULT_NOB_MODEL_REVISION = "bdd18aac37718bd1d313f7adbaada7366ca84d12"
 DEFAULT_NNO_MODEL_ID = "NbAiLab/normform-nynorsk-multitask"
-DEFAULT_NNO_MODEL_REVISION = "350cf9d3aeeba2f390353f4147ef2910dff7b0ee"
+DEFAULT_NNO_MODEL_REVISION = "1453a74d1d7ba8e9816d69a30c960437a0923484"
 DEFAULT_MODEL_BY_LANG = {
     "nob": DEFAULT_NOB_MODEL_ID,
     "nno": DEFAULT_NNO_MODEL_ID,
